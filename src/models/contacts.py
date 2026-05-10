@@ -40,7 +40,7 @@ async def delete_contact(db, user_id, contact_id):
     return True
 
 
-async def add_contact(db, user_id, model: Contact):
+async def add_contact(db, user_id, model: AddContact):
     try:
         async with db.execute(
             'INSERT INTO user_contacts (user_id,name,phone_number,date_of_birth,notes) VALUES (?, ? , ? , ? , ?)',
