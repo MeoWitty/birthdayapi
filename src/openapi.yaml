@@ -1,0 +1,286 @@
+# Birthday API - OpenAPI 3.0 Specification
+openapi: 3.0.3
+info:
+  title: Birthday API
+  description: |
+    RESTful API для управления контактами и праздниками рождения. 
+    Все операции (кроме аутентификации) требуют валидной авторизации через заголовок X-Token.
+
+    ## Аутентификация
+    Для входа используйте POST /auth с данными пользователя (name, password). При успешной авторизации сервер возвращает токен доступа. Сохраните этот токен и отправляйте его во всех последующих запросах в заголовке **X-Token**. Сервер проверит наличие этого токена перед обработкой защищённых эндпоинтов.
+
+  version: 1.0.0
+  contact: {}
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: auth
+    description: Операции аутентификации
+  - name: contacts
+    description: Управление контактами пользователя
+
+paths:
+  
+  # --- АУТЕНТИФИКАЦИЯ ---
+
+  /auth:
+    post:
+      tags: [auth]
+      summary: Авторизация пользователя
+      description: Получение токена доступа для аутентификации. После успешной авторизации токен сохраняется в заголовке X-Token для всех последующих запросов.
+      operationId: authUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: $ref '#/components/schemas/User'
+
+      responses:
+        '200': 
+          description: Авторизация успешна, токен получен в ответе. Токен нужно сохранить и использовать в заголовке X-Token для следующих запросов.
+          content:
+            application/json:
+              schema: $ref '#/components/schemas/AuthResponse'
+
+        '404': # Пользователь не найден или неверные данные входа (имя/пароль)
+          description: Пользователь не найден или неверный пароль. Проверьте имя и пароль, попробуйте снова.
+          content:
+            application/json:
+              schema: $ref '#/components/schemas/Error'
+
+  # --- КОНТАКТЫ ---
+
+  /contacts:
+    get:
+      tags: [contacts]
+      summary: Получить список контактов пользователя
+      description: Возвращает все контакты текущего авторизованного пользователя, отсортированные по имени. Требует валидной авторизации через заголовок X-Token.
+      operationId: getContacts
+
+      security: [] # Требуется аутентификация (проверяется middleware)
+
+      responses:
+        '200':
+          description: Список контактов успешно получен
+          content:
+            application/json:
+              schema: $ref '#/components/schemas/ContactList'
+
+  /contact/{contact_id}: # GET, DELETE
+  
+    get: # Получить конкретный контакт по ID (требует авторизации)
+      tags: [contacts]
+      summary: Получить информацию о контакте по ID
+      description: Возвращает данные конкретного контакта. Требует валидной авторизации через заголовок X-Token.
+
+      security: [] # Требуется аутентификация (проверяется middleware)
+
+      parameters:
+        - in: path
+          name: contact_id
+          required: true
+          schema: 
+            type: integer
+            description: Уникальный идентификатор контакта
+            
+      responses:
+        '200': # Контакт найден и возвращён в теле ответа. Если контакт не существует, возвращается 404 с сообщением об ошибке.
+          description: Информация о контакте успешно получена
+          content:
+            application/json:
+              schema: $ref '#/components/schemas/Contact'
+
+        '403': # Пользователь не авторизован (отсутствует или неверный токен X-Token)
+          description: Вы не авторизованы. Проверьте заголовок X-Token и попробуйте снова.
+          
+        '404': # Контакт с указанным ID не найден для текущего пользователя
+          description: Контакт с указанным ID не существует для текущего пользователя
+
+    delete: # Удалить контакт по ID (требует авторизации)
+      tags: [contacts]
+      summary: Удалить контакт по идентификатору
+      description: Удаляет контакт из базы данных. Требует валидной авторизации через заголовок X-Token.
+
+      security: [] # Требуется аутентификация (проверяется middleware)
+
+      parameters:
+        - in: path
+          name: contact_id
+          required: true
+          schema: 
+            type: integer
+            description: Уникальный идентификатор контакта
+            
+      responses:
+        '204': # Контакт успешно удалён. Если контакт не существует, возвращается 404 с сообщением об ошибке.
+          description: Контакт успешно удалён
+
+        '403': # Пользователь не авторизован (отсутствует или неверный токен X-Token)
+          description: Вы не авторизованы. Проверьте заголовок X-Token и попробуйте снова.
+
+        '404': # Контакт с указанным ID не найден для текущего пользователя
+          description: Контакт с указанным ID не существует для текущего пользователя
+
+  /contact: # POST, PUT
+  
+    post: # Создать новый контакт (требует авторизации)
+      tags: [contacts]
+      summary: Создать новый контакт
+      description: Добавляет нового контакта в базу данных. Требует валидной авторизации через заголовок X-Token.
+
+      security: [] # Требуется аутентификация (проверяется middleware)
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: $ref '#/components/schemas/CreateContact'
+
+      responses:
+        '201': # Контакт успешно создан. Возвращается объект контакта с ID в теле ответа. Если контакт не может быть создан, возвращается 409 (контакт уже существует).
+          description: Контакт успешно создан
+          content:
+            application/json:
+              schema: $ref '#/components/schemas/Contact'
+
+        '403': # Пользователь не авторизован (отсутствует или неверный токен X-Token)
+          description: Вы не авторизованы. Проверьте заголовок X-Token и попробуйте снова.
+
+    put: # Обновить существующий контакт по ID (требует авторизации)
+      tags: [contacts]
+      summary: Обновить информацию о контакте
+      description: Обновляет данные контакта в базе данных. Требует валидной авторизации через заголовок X-Token.
+
+      security: [] # Требуется аутентификация (проверяется middleware)
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: $ref '#/components/schemas/UpdateContact'
+
+      responses:
+        '200': # Контакт успешно обновлён. Возвращается объект контакта с новыми данными в теле ответа. Если контакт не существует, возвращается 404 с сообщением об ошибке.
+          description: Контакт успешно обновлён
+          content:
+            application/json:
+              schema: $ref '#/components/schemas/Contact'
+
+        '403': # Пользователь не авторизован (отсутствует или неверный токен X-Token)
+          description: Вы не авторизованы. Проверьте заголовок X-Token и попробуйте снова.
+
+        '404': # Контакт с указанным ID не найден для текущего пользователя
+          description: Контакт с указанным ID не существует для текущего пользователя
+
+components:
+  schemas:
+    User:
+      type: object
+      required: [name, password]
+      properties:
+        name: 
+          type: string 
+          example:"Ivan Ivanov" # Имя пользователя (username) - используется для входа в систему. Не должно совпадать с именем контакта.
+
+        password: 
+          type: string  
+          example:"1234567890" # Пароль пользователя - должен соответствовать паролю, указанному при регистрации аккаунта.
+      
+    AuthResponse:
+      type: object
+      required: [token]
+      properties:
+        token: 
+          type: string  
+          example:"a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" # Токен доступа для аутентификации. Используется в заголовке X-Token для всех последующих запросов.
+
+    Contact:
+      type: object
+      required: [id, name, phone_number, date_of_birth]
+      properties:
+        id: 
+          type: integer  
+          example:"1" # Уникальный идентификатор контакта в базе данных. Генерируется автоматически при создании контакта.
+
+        name: 
+          type:string  
+          example:"Petr Petrov" # Имя контакта - используется для поиска и сортировки контактов.
+
+        phone_number: 
+          type:string  
+          example:"+7 (903) 123-45-67" # Номер телефона контакта в международном формате с кодом страны.
+
+        date_of_birth: 
+          type: date  
+          format:"date"
+          example:"1980-05-20" # Дата рождения контакта в формате YYYY-MM-DD. Используется для расчёта возраста и напоминаний о дне рождения.
+
+        notes: 
+          type: string  
+          nullable:true
+          example:"Родился 20 мая 1980 года, любит рыбалку." # Дополнительные заметки о контакте (необязательное поле). Может быть пустым или содержать произвольный текст.
+
+    ContactList:
+      type: array
+      items: 
+        $ref:'#/components/schemas/Contact'
+      
+    CreateContact:
+      type: object
+      required: [name, phone_number, date_of_birth] # id генерируется автоматически при создании контакта в БД. notes - необязательное поле.
+
+      properties:
+        name: 
+          type: string  
+          example:"Petr Petrov" # Имя контакта - используется для поиска и сортировки контактов.
+
+        phone_number: 
+          type: string  
+          example:"+7 (903) 123-45-67" # Номер телефона контакта в международном формате с кодом страны.
+
+        date_of_birth: 
+          type: date  
+          format:"date"
+          example:"1980-05-20" # Дата рождения контакта в формате YYYY-MM-DD. Используется для расчёта возраста и напоминаний о дне рождения.
+
+        notes: 
+          type: string  
+          nullable:true
+          example:"Родился 20 мая 1980 года, любит рыбалку." # Дополнительные заметки о контакте (необязательное поле). Может быть пустым или содержать произвольный текст.
+
+    UpdateContact:
+      type: object
+      required: [id, name, phone_number, date_of_birth] # id - идентификатор контакта для обновления. notes - необязательное поле.
+
+      properties:
+        id: 
+          type: integer  
+          example:"1" # Уникальный идентификатор контакта в базе данных. Используется для идентификации конкретного контакта при обновлении.
+
+        name: 
+          type: string  
+          example:"Petr Petrov" # Имя контакта - используется для поиска и сортировки контактов.
+
+        phone_number: 
+          type: string  
+          example:"+7 (903) 123-45-67" # Номер телефона контакта в международном формате с кодом страны.
+
+        date_of_birth: 
+          type: date  
+          format:"date"
+          example:"1980-05-20" # Дата рождения контакта в формате YYYY-MM-DD. Используется для расчёта возраста и напоминаний о дне рождения.
+
+        notes: 
+          type: string  
+          nullable:true
+          example:"Родился 20 мая 1980 года, любит рыбалку." # Дополнительные заметки о контакте (необязательное поле). Может быть пустым или содержать произвольный текст.
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: 
+          type:string  
+          example:"User not found"
