@@ -52,6 +52,11 @@ protected_router = APIRouter(
 async def route_get_contacts(request: Request):
     return await contacts.get_contacts(request.app.db, request.state.user_id)
 
+# получение ближайших ДР пользователей
+@protected_router.get("/contacts/birthdays")
+async def route_get_contacts(request: Request):
+    return await contacts.get_contacts_birthdays(request.app.db, request.state.user_id)
+
 @protected_router.get("/contact/{contact_id}", response_model=contacts.Contact, status_code=200)
 async def route_get_contact(request: Request, contact_id: int):
     contact = await contacts.get_one_contact(request.app.db, request.state.user_id, contact_id)
